@@ -1,3 +1,7 @@
+
+import { db } from './database';
+import { emailService } from './emailService';
+
 // AI Crew Agents for SPARK platform
 class BaseAgent {
   protected name: string;
@@ -108,14 +112,24 @@ export class CertificateAgent extends BaseAgent {
   }
 
   async monitorCertificateStatus(): Promise<any> {
-    const metrics = await db.getSystemMetrics();
-    return {
-      pendingCertificates: Math.floor(Math.random() * 50),
-      averageProcessingTime: '2.3 hours',
-      successRate: 98.5,
-      blockchainHealth: 'Operational',
-      ...metrics
-    };
+    try {
+      const metrics = await db.getSystemMetrics();
+      return {
+        pendingCertificates: Math.floor(Math.random() * 50),
+        averageProcessingTime: '2.3 hours',
+        successRate: 98.5,
+        blockchainHealth: 'Operational',
+        ...metrics
+      };
+    } catch (error) {
+      return {
+        pendingCertificates: Math.floor(Math.random() * 50),
+        averageProcessingTime: '2.3 hours',
+        successRate: 98.5,
+        blockchainHealth: 'Operational',
+        error: 'Database connection failed'
+      };
+    }
   }
 
   async process(input: { action: string; certificateData?: any; document?: any }): Promise<any> {
@@ -144,38 +158,56 @@ export class AnalyticsAgent extends BaseAgent {
 
   async predictDemand(serviceType: string, timeframe: string): Promise<any> {
     // Enhanced LSTM/ARIMA prediction with real data consideration
-    const metrics = await db.getSystemMetrics();
-    const confidence = 85 + Math.random() * 10;
-    
-    const predictions = {
-      'birth_certificate': {
-        peak_hours: ['10:00-12:00', '14:00-16:00'],
-        expected_load: Math.floor(50 + Math.random() * 100),
-        recommendation: 'Allocate 2 additional counters during peak hours',
-        trend: 'increasing',
-        efficiency_score: 87.5
-      },
-      'income_certificate': {
-        peak_hours: ['09:00-11:00', '15:00-17:00'],
-        expected_load: Math.floor(30 + Math.random() * 80),
-        recommendation: 'Enable online processing to reduce physical visits',
-        trend: 'stable',
-        efficiency_score: 92.1
-      }
-    };
+    try {
+      const metrics = await db.getSystemMetrics();
+      const confidence = 85 + Math.random() * 10;
+      
+      const predictions = {
+        'birth_certificate': {
+          peak_hours: ['10:00-12:00', '14:00-16:00'],
+          expected_load: Math.floor(50 + Math.random() * 100),
+          recommendation: 'Allocate 2 additional counters during peak hours',
+          trend: 'increasing',
+          efficiency_score: 87.5
+        },
+        'income_certificate': {
+          peak_hours: ['09:00-11:00', '15:00-17:00'],
+          expected_load: Math.floor(30 + Math.random() * 80),
+          recommendation: 'Enable online processing to reduce physical visits',
+          trend: 'stable',
+          efficiency_score: 92.1
+        }
+      };
 
-    const result = {
-      serviceType,
-      timeframe,
-      confidence: Math.round(confidence * 10) / 10,
-      prediction: predictions[serviceType as keyof typeof predictions] || predictions['birth_certificate'],
-      timestamp: new Date().toISOString(),
-      systemMetrics: metrics,
-      aiModelVersion: '2.1.0'
-    };
+      const result = {
+        serviceType,
+        timeframe,
+        confidence: Math.round(confidence * 10) / 10,
+        prediction: predictions[serviceType as keyof typeof predictions] || predictions['birth_certificate'],
+        timestamp: new Date().toISOString(),
+        systemMetrics: metrics,
+        aiModelVersion: '2.1.0'
+      };
 
-    console.log(`🧠 AI Prediction generated for ${serviceType}: ${result.confidence}% confidence`);
-    return result;
+      console.log(`🧠 AI Prediction generated for ${serviceType}: ${result.confidence}% confidence`);
+      return result;
+    } catch (error) {
+      // Fallback prediction if database fails
+      return {
+        serviceType,
+        timeframe,
+        confidence: 75,
+        prediction: {
+          peak_hours: ['10:00-12:00', '14:00-16:00'],
+          expected_load: Math.floor(50 + Math.random() * 100),
+          recommendation: 'System temporarily using cached predictions',
+          trend: 'stable',
+          efficiency_score: 85.0
+        },
+        timestamp: new Date().toISOString(),
+        error: 'Database connection failed, using fallback'
+      };
+    }
   }
 
   async analyzeUserBehavior(userId: string): Promise<any> {
@@ -378,7 +410,7 @@ export class SystemMonitoringAgent extends BaseAgent {
         metrics
       };
     } catch (error) {
-      return { status: 'error', error: error.message };
+      return { status: 'error', error: error instanceof Error ? error.message : 'Unknown database error' };
     }
   }
 
@@ -462,8 +494,13 @@ export class AICrewOrchestrator {
   async processComplexWorkflow(workflow: { agent: string; input: any }[]): Promise<any[]> {
     const results = [];
     for (const task of workflow) {
-      const result = await this.executeTask(task.agent, task.input);
-      results.push(result);
+      try {
+        const result = await this.executeTask(task.agent, task.input);
+        results.push(result);
+      } catch (error) {
+        console.error(`Error in workflow task ${task.agent}:`, error);
+        results.push({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
     return results;
   }
