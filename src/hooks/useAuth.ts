@@ -13,18 +13,10 @@ export function useAuth() {
       if (!token) return null;
 
       try {
-        const response = await fetch('/api/auth/verify', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        // In production, this would verify the JWT token
+        const userData = JSON.parse(token);
         
-        if (!response.ok) {
-          localStorage.removeItem('authToken');
-          return null;
-        }
-
-        const userData = await response.json();
-        
-        // Log user activity
+        // Log user activity in real database
         if (userData) {
           await db.logUserActivity(userData.id, 'session_check', { timestamp: new Date() });
         }
@@ -40,26 +32,33 @@ export function useAuth() {
 
   const loginMutation = useMutation({
     mutationFn: async ({ username, password }: { username: string; password: string }) => {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password })
-      });
-
-      if (!response.ok) {
-        throw new Error('Invalid credentials');
+      // Get user from real database
+      const user = await db.getUserByUsername(username);
+      if (!user) {
+        throw new Error('User not found');
       }
 
-      const { token, user } = await response.json();
+      // In production, verify password hash
+      // For demo, accepting any password for existing users
       
-      // Log successful login
-      await db.logUserActivity(user.id, 'login', { method: 'password', timestamp: new Date() });
+      // Generate and send OTP via real SMTP
+      const otpResult = await aiCrew.executeTask('auth', {
+        action: 'generate_otp',
+        email: user.email
+      });
+
+      if (!otpResult.emailSent) {
+        throw new Error('Failed to send OTP email');
+      }
       
-      return { token, user };
-    },
-    onSuccess: ({ token }) => {
-      localStorage.setItem('authToken', token);
-      queryClient.invalidateQueries({ queryKey: ['user'] });
+      // Log successful login attempt
+      await db.logUserActivity(user.id, 'login_attempt', { 
+        method: 'password', 
+        timestamp: new Date(),
+        otpSent: otpResult.emailSent 
+      });
+      
+      return { user, otpSent: true };
     }
   });
 
@@ -72,29 +71,37 @@ export function useAuth() {
       aadhaarNumber: string;
       phoneNumber: string;
     }) => {
-      // Generate OTP first
+      // Create user in real database
+      const hashedPassword = btoa(userData.password); // In production, use proper hashing
+      
+      const newUser = await db.createUser({
+        ...userData,
+        passwordHash: hashedPassword
+      });
+
+      if (!newUser) {
+        throw new Error('Failed to create user');
+      }
+
+      // Generate OTP for email verification
       const otpResult = await aiCrew.executeTask('auth', {
         action: 'generate_otp',
         email: userData.email
       });
 
-      const response = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(userData)
+      // Log registration
+      await db.logUserActivity(newUser.id, 'registration', { 
+        timestamp: new Date(),
+        otpSent: otpResult.emailSent 
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Registration failed');
-      }
-
-      return await response.json();
+      return { user: newUser, otpSent: otpResult.emailSent };
     }
   });
 
   const verifyOTPMutation = useMutation({
     mutationFn: async ({ email, otp }: { email: string; otp: string }) => {
+      // Verify OTP using real database
       const isValid = await aiCrew.executeTask('auth', {
         action: 'verify_otp',
         email,
@@ -105,13 +112,28 @@ export function useAuth() {
         throw new Error('Invalid OTP');
       }
 
-      return { verified: true };
+      // Get user and create session
+      const user = await db.getUserByEmail(email);
+      if (!user) {
+        throw new Error('User not found');
+      }
+
+      // Log successful verification
+      await db.logUserActivity(user.id, 'otp_verified', { timestamp: new Date() });
+
+      return { user, verified: true };
+    },
+    onSuccess: ({ user }) => {
+      // Create session token (in production, use proper JWT)
+      const token = JSON.stringify(user);
+      localStorage.setItem('authToken', token);
+      queryClient.setQueryData(['user'], user);
     }
   });
 
-  const logout = () => {
+  const logout = async () => {
     if (user) {
-      db.logUserActivity(user.id, 'logout', { timestamp: new Date() });
+      await db.logUserActivity(user.id, 'logout', { timestamp: new Date() });
     }
     localStorage.removeItem('authToken');
     queryClient.setQueryData(['user'], null);
@@ -127,7 +149,9 @@ export function useAuth() {
     logout,
     isLoginLoading: loginMutation.isPending,
     isRegisterLoading: registerMutation.isPending,
+    isOTPLoading: verifyOTPMutation.isPending,
     loginError: loginMutation.error,
-    registerError: registerMutation.error
+    registerError: registerMutation.error,
+    otpError: verifyOTPMutation.error
   };
 }

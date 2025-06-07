@@ -33,16 +33,30 @@ interface Certificate {
   digitalSignature: string;
 }
 
+interface OTPRecord {
+  id: string;
+  email: string;
+  otp: string;
+  expiresAt: Date;
+  verified: boolean;
+}
+
 class DatabaseManager {
-  private dbUrl = 'postgres://postgres:jayanthir@localhost:5432/document';
+  private dbUrl = 'postgres://postgres:Mdcse1221%40@localhost:5000/document';
 
   async query(sql: string, params: any[] = []): Promise<any[]> {
     try {
       const response = await fetch('/api/db/query', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sql, params })
+        body: JSON.stringify({ sql, params, connectionString: this.dbUrl })
       });
+      
+      if (!response.ok) {
+        console.error('Database query failed:', response.statusText);
+        return [];
+      }
+      
       const data = await response.json();
       return data.rows || [];
     } catch (error) {
@@ -78,11 +92,43 @@ class DatabaseManager {
   async getUserByUsername(username: string): Promise<User | null> {
     const sql = `
       SELECT id, username, email, name, aadhaar_number as "aadhaarNumber", 
-             phone_number as "phoneNumber", role, created_at
+             phone_number as "phoneNumber", role, created_at, password_hash
       FROM users WHERE username = $1
     `;
     const result = await this.query(sql, [username]);
     return result[0] || null;
+  }
+
+  async getUserByEmail(email: string): Promise<User | null> {
+    const sql = `
+      SELECT id, username, email, name, aadhaar_number as "aadhaarNumber", 
+             phone_number as "phoneNumber", role, created_at
+      FROM users WHERE email = $1
+    `;
+    const result = await this.query(sql, [email]);
+    return result[0] || null;
+  }
+
+  async storeOTP(email: string, otp: string, expiresAt: Date): Promise<boolean> {
+    const sql = `
+      INSERT INTO otp_records (email, otp, expires_at, verified)
+      VALUES ($1, $2, $3, false)
+      ON CONFLICT (email) 
+      DO UPDATE SET otp = $2, expires_at = $3, verified = false
+    `;
+    const result = await this.query(sql, [email, otp, expiresAt]);
+    return result !== null;
+  }
+
+  async verifyOTP(email: string, otp: string): Promise<boolean> {
+    const sql = `
+      UPDATE otp_records 
+      SET verified = true 
+      WHERE email = $1 AND otp = $2 AND expires_at > NOW() AND verified = false
+      RETURNING id
+    `;
+    const result = await this.query(sql, [email, otp]);
+    return result.length > 0;
   }
 
   async getUserApplications(userId: string): Promise<Application[]> {
@@ -127,7 +173,27 @@ class DatabaseManager {
     `;
     await this.query(sql, [userId, action, JSON.stringify(details)]);
   }
+
+  async getSystemMetrics(): Promise<any> {
+    const queries = [
+      'SELECT COUNT(*) as total_users FROM users',
+      'SELECT COUNT(*) as total_applications FROM applications',
+      'SELECT COUNT(*) as total_certificates FROM certificates',
+      'SELECT service_type, COUNT(*) as count FROM applications GROUP BY service_type',
+      'SELECT status, COUNT(*) as count FROM applications GROUP BY status'
+    ];
+
+    const results = await Promise.all(queries.map(query => this.query(query)));
+    
+    return {
+      totalUsers: results[0][0]?.total_users || 0,
+      totalApplications: results[1][0]?.total_applications || 0,
+      totalCertificates: results[2][0]?.total_certificates || 0,
+      serviceTypes: results[3] || [],
+      applicationStatus: results[4] || []
+    };
+  }
 }
 
 export const db = new DatabaseManager();
-export type { User, Application, Certificate };
+export type { User, Application, Certificate, OTPRecord };
