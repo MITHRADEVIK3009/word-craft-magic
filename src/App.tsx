@@ -42,21 +42,21 @@ function App() {
   }
 
   return (
-    <QueryClientProvider client={queryClient}>
+  <QueryClientProvider client={queryClient}>
       <Router>
         <div className="min-h-screen bg-gray-100">
           <div className="container mx-auto py-8">
-            <Routes>
-              <Route path="/" element={<Index />} />
+        <Routes>
+          <Route path="/" element={<Index />} />
               <Route path="/database-test" element={<DatabaseTest />} />
               <Route path="/test-agents" element={<TestPage />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
+          <Route path="*" element={<NotFound />} />
+        </Routes>
           </div>
         </div>
       </Router>
-    </QueryClientProvider>
-  );
+  </QueryClientProvider>
+);
 }
 
 export default App;
