@@ -26,8 +26,8 @@ class EmailService {
       port: 587,
       secure: false,
       auth: {
-        user: process.env.SMTP_USER || 'sparkplatform2024@gmail.com',
-        pass: process.env.SMTP_PASS || 'your-app-password' // This should be set as environment variable
+        user: 'sparkplatform2024@gmail.com', // Using hardcoded value for demo
+        pass: 'your-app-password' // This should be set via environment variables in production
       }
     };
   }
