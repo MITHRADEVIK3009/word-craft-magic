@@ -1,339 +1,162 @@
-
 import { useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { toast } from "@/hooks/use-toast";
-import { useAuth } from "@/hooks/useAuth";
-import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
+import { useAuth } from '@/hooks/useAuth';
 
 export function LoginPage() {
-  const [isLogin, setIsLogin] = useState(true);
-  const [step, setStep] = useState('credentials'); // 'credentials' | 'otp'
-  const [currentEmail, setCurrentEmail] = useState('');
+  const { login, register, verifyOTP, isLoginLoading, isRegisterLoading, isOTPLoading, loginError, registerError, otpError } = useAuth();
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [showOTP, setShowOTP] = useState(false);
   const [formData, setFormData] = useState({
     username: '',
     password: '',
-    name: '',
     email: '',
+    name: '',
     aadhaarNumber: '',
     phoneNumber: '',
     otp: ''
   });
 
-  const { 
-    login, 
-    register, 
-    verifyOTP, 
-    isLoginLoading, 
-    isRegisterLoading, 
-    isOTPLoading,
-    loginError,
-    registerError,
-    otpError
-  } = useAuth();
-
-  const handleCredentialsSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (isLogin) {
-      login(
-        { username: formData.username, password: formData.password },
-        {
-          onSuccess: (data) => {
-            if (data.otpSent) {
-              setCurrentEmail(data.user.email);
-              setStep('otp');
-              toast({
-                title: "OTP Sent Successfully",
-                description: `Please check ${data.user.email} for your verification code.`,
-              });
-            }
-          },
-          onError: (error: any) => {
-            toast({
-              title: "Login Failed",
-              description: error.message || "Invalid credentials",
-              variant: "destructive",
-            });
-          }
-        }
-      );
-    } else {
-      register(
-        formData,
-        {
-          onSuccess: (data) => {
-            if (data.otpSent) {
-              setCurrentEmail(formData.email);
-              setStep('otp');
-              toast({
-                title: "Registration Successful",
-                description: `OTP sent to ${formData.email}. Please verify to complete registration.`,
-              });
-            }
-          },
-          onError: (error: any) => {
-            toast({
-              title: "Registration Failed",
-              description: error.message || "Registration failed",
-              variant: "destructive",
-            });
-          }
-        }
-      );
+    if (showOTP) {
+      verifyOTP({ email: formData.email, otp: formData.otp });
+      return;
     }
-  };
 
-  const handleOTPSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    verifyOTP(
-      { email: currentEmail, otp: formData.otp },
-      {
-        onSuccess: () => {
-          toast({
-            title: "Welcome to SPARK!",
-            description: "You have been successfully verified.",
-          });
-        },
-        onError: (error: any) => {
-          toast({
-            title: "Verification Failed",
-            description: error.message || "Invalid OTP",
-            variant: "destructive",
-          });
-        }
-      }
-    );
-  };
-
-  const handleDemoLogin = () => {
-    setFormData({ ...formData, username: 'demo_user', password: 'demo123' });
-    // Simulate successful demo login
-    const demoUser = {
-      id: 'demo-123',
-      username: 'demo_user',
-      email: 'demo@spark.gov.in',
-      name: 'Demo User',
-      aadhaarNumber: '1234-5678-9012',
-      phoneNumber: '+91-9876543210',
-      role: 'citizen',
-      created_at: new Date()
-    };
-    
-    localStorage.setItem('authToken', JSON.stringify(demoUser));
-    window.location.reload();
+    if (isRegistering) {
+      register(formData);
+    } else {
+      login({ username: formData.username, password: formData.password });
+    }
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center p-4">
-      <div className="w-full max-w-md space-y-6">
-        <div className="text-center">
-          <h1 className="text-4xl font-bold text-yellow-400 mb-2">SPARK</h1>
-          <p className="text-gray-300">Smart Public Auto Record Keeper</p>
-          <p className="text-sm text-gray-400 mt-2">Powered by AI • Secured by Blockchain • Built for Everyone</p>
-        </div>
+      <div className="bg-gray-800 p-8 rounded-lg shadow-xl w-full max-w-md">
+        <h1 className="text-3xl font-bold text-yellow-400 mb-6 text-center">
+          {showOTP ? 'Enter OTP' : isRegistering ? 'Create Account' : 'Login'}
+        </h1>
 
-        <Card className="bg-gray-800/50 border-gray-700">
-          <CardHeader>
-            <CardTitle className="text-yellow-400">
-              {step === 'otp' ? 'Email Verification' : (isLogin ? 'Login' : 'Register')}
-            </CardTitle>
-            <CardDescription className="text-gray-400">
-              {step === 'otp' 
-                ? `Enter the 6-digit code sent to ${currentEmail}`
-                : (isLogin ? 'Welcome back to SPARK' : 'Create your SPARK account')
-              }
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {step === 'credentials' ? (
-              <form onSubmit={handleCredentialsSubmit} className="space-y-4">
-                {!isLogin && (
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {showOTP ? (
+            <div>
+              <label className="block text-gray-300 mb-2">OTP</label>
+              <input
+                type="text"
+                value={formData.otp}
+                onChange={(e) => setFormData({ ...formData, otp: e.target.value })}
+                className="w-full p-2 rounded bg-gray-700 text-white border border-gray-600 focus:border-yellow-400 focus:outline-none"
+                placeholder="Enter OTP"
+                required
+              />
+        </div>
+          ) : (
+            <>
+              {isRegistering && (
                   <>
                     <div>
-                      <Label htmlFor="name" className="text-gray-300">Full Name</Label>
-                      <Input
-                        id="name"
+                    <label className="block text-gray-300 mb-2">Full Name</label>
+                    <input
                         type="text"
                         value={formData.name}
-                        onChange={(e) => setFormData({...formData, name: e.target.value})}
-                        className="bg-gray-700 border-gray-600 text-white"
-                        required={!isLogin}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      className="w-full p-2 rounded bg-gray-700 text-white border border-gray-600 focus:border-yellow-400 focus:outline-none"
                         placeholder="Enter your full name"
+                      required
                       />
                     </div>
                     <div>
-                      <Label htmlFor="email" className="text-gray-300">Email Address</Label>
-                      <Input
-                        id="email"
+                    <label className="block text-gray-300 mb-2">Email</label>
+                    <input
                         type="email"
                         value={formData.email}
-                        onChange={(e) => setFormData({...formData, email: e.target.value})}
-                        className="bg-gray-700 border-gray-600 text-white"
-                        required={!isLogin}
-                        placeholder="your.email@example.com"
+                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      className="w-full p-2 rounded bg-gray-700 text-white border border-gray-600 focus:border-yellow-400 focus:outline-none"
+                      placeholder="Enter your email"
+                      required
                       />
                     </div>
                     <div>
-                      <Label htmlFor="aadhaar" className="text-gray-300">Aadhaar Number</Label>
-                      <Input
-                        id="aadhaar"
+                    <label className="block text-gray-300 mb-2">Aadhaar Number</label>
+                    <input
                         type="text"
                         value={formData.aadhaarNumber}
-                        onChange={(e) => setFormData({...formData, aadhaarNumber: e.target.value})}
-                        className="bg-gray-700 border-gray-600 text-white"
-                        required={!isLogin}
-                        placeholder="1234-5678-9012"
-                        maxLength={12}
+                      onChange={(e) => setFormData({ ...formData, aadhaarNumber: e.target.value })}
+                      className="w-full p-2 rounded bg-gray-700 text-white border border-gray-600 focus:border-yellow-400 focus:outline-none"
+                      placeholder="Enter your Aadhaar number"
+                      required
                       />
                     </div>
                     <div>
-                      <Label htmlFor="phone" className="text-gray-300">Phone Number</Label>
-                      <Input
-                        id="phone"
+                    <label className="block text-gray-300 mb-2">Phone Number</label>
+                    <input
                         type="tel"
                         value={formData.phoneNumber}
-                        onChange={(e) => setFormData({...formData, phoneNumber: e.target.value})}
-                        className="bg-gray-700 border-gray-600 text-white"
-                        required={!isLogin}
-                        placeholder="+91-9876543210"
+                      onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
+                      className="w-full p-2 rounded bg-gray-700 text-white border border-gray-600 focus:border-yellow-400 focus:outline-none"
+                      placeholder="Enter your phone number"
+                      required
                       />
                     </div>
                   </>
                 )}
                 <div>
-                  <Label htmlFor="username" className="text-gray-300">Username</Label>
-                  <Input
-                    id="username"
+                <label className="block text-gray-300 mb-2">Username</label>
+                <input
                     type="text"
                     value={formData.username}
-                    onChange={(e) => setFormData({...formData, username: e.target.value})}
-                    className="bg-gray-700 border-gray-600 text-white"
+                  onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                  className="w-full p-2 rounded bg-gray-700 text-white border border-gray-600 focus:border-yellow-400 focus:outline-none"
+                  placeholder="Enter your username"
                     required
-                    placeholder="Enter username"
                   />
                 </div>
                 <div>
-                  <Label htmlFor="password" className="text-gray-300">Password</Label>
-                  <Input
-                    id="password"
+                <label className="block text-gray-300 mb-2">Password</label>
+                <input
                     type="password"
                     value={formData.password}
-                    onChange={(e) => setFormData({...formData, password: e.target.value})}
-                    className="bg-gray-700 border-gray-600 text-white"
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  className="w-full p-2 rounded bg-gray-700 text-white border border-gray-600 focus:border-yellow-400 focus:outline-none"
+                  placeholder="Enter your password"
                     required
-                    placeholder="Enter password"
                   />
                 </div>
-                <Button 
+            </>
+          )}
+
+          <button
                   type="submit" 
-                  className="w-full bg-yellow-400 hover:bg-yellow-500 text-gray-900 font-semibold"
-                  disabled={isLoginLoading || isRegisterLoading}
-                >
-                  {(isLoginLoading || isRegisterLoading) ? (
-                    <div className="flex items-center gap-2">
-                      <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-gray-900"></div>
-                      {isLogin ? 'Logging in...' : 'Creating account...'}
-                    </div>
-                  ) : (
-                    isLogin ? 'Login' : 'Create Account'
-                  )}
-                </Button>
-              </form>
-            ) : (
-              <form onSubmit={handleOTPSubmit} className="space-y-6">
-                <div className="space-y-2">
-                  <Label htmlFor="otp" className="text-gray-300">Enter 6-Digit OTP</Label>
-                  <div className="flex justify-center">
-                    <InputOTP
-                      maxLength={6}
-                      value={formData.otp}
-                      onChange={(value) => setFormData({...formData, otp: value})}
-                    >
-                      <InputOTPGroup>
-                        <InputOTPSlot index={0} className="bg-gray-700 border-gray-600 text-white" />
-                        <InputOTPSlot index={1} className="bg-gray-700 border-gray-600 text-white" />
-                        <InputOTPSlot index={2} className="bg-gray-700 border-gray-600 text-white" />
-                        <InputOTPSlot index={3} className="bg-gray-700 border-gray-600 text-white" />
-                        <InputOTPSlot index={4} className="bg-gray-700 border-gray-600 text-white" />
-                        <InputOTPSlot index={5} className="bg-gray-700 border-gray-600 text-white" />
-                      </InputOTPGroup>
-                    </InputOTP>
-                  </div>
-                  <p className="text-sm text-gray-400 text-center">
-                    Check your email for the verification code
-                  </p>
-                </div>
+            disabled={isLoginLoading || isRegisterLoading || isOTPLoading}
+            className="w-full bg-yellow-400 text-gray-900 py-2 px-4 rounded font-semibold hover:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:ring-opacity-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isLoginLoading || isRegisterLoading || isOTPLoading ? (
+              <span className="flex items-center justify-center">
+                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-gray-900" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Processing...
+              </span>
+            ) : showOTP ? 'Verify OTP' : isRegistering ? 'Register' : 'Login'}
+          </button>
                 
-                <Button 
-                  type="submit" 
-                  className="w-full bg-yellow-400 hover:bg-yellow-500 text-gray-900 font-semibold"
-                  disabled={isOTPLoading || formData.otp.length !== 6}
-                >
-                  {isOTPLoading ? (
-                    <div className="flex items-center gap-2">
-                      <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-gray-900"></div>
-                      Verifying...
-                    </div>
-                  ) : (
-                    'Verify Email'
-                  )}
-                </Button>
-                
-                <Button 
+          {!showOTP && (
+            <button
                   type="button" 
-                  variant="outline"
-                  className="w-full border-gray-600 text-gray-300 hover:bg-gray-700"
-                  onClick={() => setStep('credentials')}
-                >
-                  ← Back to Login
-                </Button>
-              </form>
+              onClick={() => setIsRegistering(!isRegistering)}
+              className="w-full text-gray-300 hover:text-yellow-400 mt-2"
+                  >
+              {isRegistering ? 'Already have an account? Login' : "Don't have an account? Register"}
+            </button>
             )}
 
-            {step === 'credentials' && (
-              <>
-                <div className="text-center">
-                  <Button 
-                    variant="outline" 
-                    className="w-full border-gray-600 text-gray-300 hover:bg-gray-700"
-                    onClick={() => setIsLogin(!isLogin)}
-                  >
-                    {isLogin ? "Don't have an account? Register" : "Already have an account? Login"}
-                  </Button>
-                </div>
-
-                <div className="text-center">
-                  <Button 
-                    onClick={handleDemoLogin}
-                    className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold"
-                  >
-                    🚀 Quick Demo Access
-                  </Button>
-                  <p className="text-xs text-gray-400 mt-2">
-                    Experience SPARK instantly with demo data
-                  </p>
-                </div>
-              </>
-            )}
-
-            {/* Error Display */}
             {(loginError || registerError || otpError) && (
-              <div className="p-3 bg-red-900/50 border border-red-600 rounded text-red-200 text-sm">
+            <div className="text-red-400 text-sm mt-2">
                 {loginError?.message || registerError?.message || otpError?.message}
               </div>
             )}
-          </CardContent>
-        </Card>
-
-        <div className="text-center text-xs text-gray-500">
-          <p>🔒 Secured with blockchain technology</p>
-          <p>🧠 Powered by Microsoft AI</p>
-          <p>🌍 Accessible in multiple languages</p>
-        </div>
+        </form>
       </div>
     </div>
   );

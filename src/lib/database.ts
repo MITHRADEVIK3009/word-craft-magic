@@ -1,3 +1,6 @@
+import { supabase } from '@/integrations/supabase/client';
+import type { Database } from '@/integrations/supabase/types';
+import SupabaseConnectionTest from './components/SupabaseConnectionTest';
 
 interface User {
   id: string;
@@ -17,7 +20,7 @@ interface Application {
   status: string;
   progress: number;
   submittedAt: Date;
-  estimatedCompletion?: Date;
+  estimatedCompletion: Date;
   completedAt?: Date;
 }
 
@@ -42,29 +45,6 @@ interface OTPRecord {
 }
 
 class DatabaseManager {
-  private dbUrl = 'postgres://postgres:Mdcse1221%40@localhost:5000/document';
-
-  async query(sql: string, params: any[] = []): Promise<any[]> {
-    try {
-      const response = await fetch('/api/db/query', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sql, params, connectionString: this.dbUrl })
-      });
-      
-      if (!response.ok) {
-        console.error('Database query failed:', response.statusText);
-        return [];
-      }
-      
-      const data = await response.json();
-      return data.rows || [];
-    } catch (error) {
-      console.error('Database query error:', error);
-      return [];
-    }
-  }
-
   async createUser(userData: {
     username: string;
     email: string;
@@ -73,82 +53,162 @@ class DatabaseManager {
     phoneNumber: string;
     passwordHash: string;
   }): Promise<User | null> {
-    const sql = `
-      INSERT INTO users (username, email, name, aadhaar_number, phone_number, password_hash, role)
-      VALUES ($1, $2, $3, $4, $5, $6, 'citizen')
-      RETURNING id, username, email, name, aadhaar_number as "aadhaarNumber", phone_number as "phoneNumber", role, created_at
-    `;
-    const result = await this.query(sql, [
-      userData.username,
-      userData.email,
-      userData.name,
-      userData.aadhaarNumber,
-      userData.phoneNumber,
-      userData.passwordHash
-    ]);
-    return result[0] || null;
+    const { data, error } = await supabase
+      .from('profiles')
+      .insert({
+        id: crypto.randomUUID(),
+        first_name: userData.name,
+        last_name: '',
+        phone: userData.phoneNumber,
+        aadhaar_number: userData.aadhaarNumber,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating user:', error);
+      return null;
+    }
+
+    return {
+      id: data.id,
+      username: userData.username,
+      email: userData.email,
+      name: userData.name,
+      aadhaarNumber: data.aadhaar_number || '',
+      phoneNumber: data.phone || '',
+      role: 'citizen',
+      created_at: new Date(data.created_at)
+    };
   }
 
   async getUserByUsername(username: string): Promise<User | null> {
-    const sql = `
-      SELECT id, username, email, name, aadhaar_number as "aadhaarNumber", 
-             phone_number as "phoneNumber", role, created_at, password_hash
-      FROM users WHERE username = $1
-    `;
-    const result = await this.query(sql, [username]);
-    return result[0] || null;
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', username)
+      .single();
+
+    if (error) {
+      console.error('Error fetching user:', error);
+      return null;
+    }
+
+    return {
+      id: data.id,
+      username: username,
+      email: '', // You'll need to store this in a separate table
+      name: data.first_name || '',
+      aadhaarNumber: data.aadhaar_number || '',
+      phoneNumber: data.phone || '',
+      role: 'citizen',
+      created_at: new Date(data.created_at)
+    };
   }
 
   async getUserByEmail(email: string): Promise<User | null> {
-    const sql = `
-      SELECT id, username, email, name, aadhaar_number as "aadhaarNumber", 
-             phone_number as "phoneNumber", role, created_at
-      FROM users WHERE email = $1
-    `;
-    const result = await this.query(sql, [email]);
-    return result[0] || null;
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('email', email)
+      .single();
+
+    if (error) {
+      console.error('Error fetching user by email:', error);
+      return null;
+    }
+
+    return {
+      id: data.id,
+      username: data.id, // Using ID as username for now
+      email: email,
+      name: data.first_name || '',
+      aadhaarNumber: data.aadhaar_number || '',
+      phoneNumber: data.phone || '',
+      role: 'citizen',
+      created_at: new Date(data.created_at)
+    };
   }
 
   async storeOTP(email: string, otp: string, expiresAt: Date): Promise<boolean> {
-    const sql = `
-      INSERT INTO otp_records (email, otp, expires_at, verified)
-      VALUES ($1, $2, $3, false)
-      ON CONFLICT (email) 
-      DO UPDATE SET otp = $2, expires_at = $3, verified = false
-    `;
-    const result = await this.query(sql, [email, otp, expiresAt]);
-    return result !== null;
+    const { error } = await supabase
+      .from('otp_records')
+      .upsert({
+        email,
+        otp,
+        expires_at: expiresAt.toISOString(),
+        verified: false
+      });
+
+    return !error;
   }
 
   async verifyOTP(email: string, otp: string): Promise<boolean> {
-    const sql = `
-      UPDATE otp_records 
-      SET verified = true 
-      WHERE email = $1 AND otp = $2 AND expires_at > NOW() AND verified = false
-      RETURNING id
-    `;
-    const result = await this.query(sql, [email, otp]);
-    return result.length > 0;
+    const { data, error } = await supabase
+      .from('otp_records')
+      .update({ verified: true })
+      .eq('email', email)
+      .eq('otp', otp)
+      .gt('expires_at', new Date().toISOString())
+      .eq('verified', false)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error verifying OTP:', error);
+      return false;
+    }
+
+    return !!data;
   }
 
   async getUserApplications(userId: string): Promise<Application[]> {
-    const sql = `
-      SELECT id, user_id as "userId", service_type as "serviceType", status, progress,
-             submitted_at as "submittedAt", estimated_completion as "estimatedCompletion",
-             completed_at as "completedAt"
-      FROM applications WHERE user_id = $1 ORDER BY submitted_at DESC
-    `;
-    return await this.query(sql, [userId]);
+    const { data, error } = await supabase
+      .from('service_requests')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching applications:', error);
+      return [];
+    }
+
+    return data.map(app => ({
+      id: app.id,
+      userId: app.user_id,
+      serviceType: app.service_type,
+      status: app.status,
+      progress: app.progress || 0,
+      submittedAt: new Date(app.created_at),
+      estimatedCompletion: app.estimated_completion_date ? new Date(app.estimated_completion_date) : new Date(),
+      completedAt: app.status === 'completed' ? new Date(app.updated_at) : undefined
+    }));
   }
 
   async getUserCertificates(userId: string): Promise<Certificate[]> {
-    const sql = `
-      SELECT id, user_id as "userId", type, issue_date as "issueDate",
-             valid_until as "validUntil", authority, blockchain_hash as "blockchainHash",
-             ipfs_hash as "ipfsHash", digital_signature as "digitalSignature"
-      FROM certificates WHERE user_id = $1 ORDER BY issue_date DESC
-    `;
-    return await this.query(sql, [userId]);
+    const { data, error } = await supabase
+      .from('certificates')
+      .select('*')
+      .eq('user_id', userId)
+      .order('issue_date', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching certificates:', error);
+      return [];
+    }
+
+    return data.map(cert => ({
+      id: cert.id,
+      userId: cert.user_id,
+      type: cert.type,
+      issueDate: new Date(cert.issue_date),
+      validUntil: new Date(cert.valid_until),
+      authority: cert.authority,
+      blockchainHash: cert.blockchain_hash,
+      ipfsHash: cert.ipfs_hash,
+      digitalSignature: cert.digital_signature
+    }));
   }
 
   async createApplication(appData: {
@@ -156,42 +216,86 @@ class DatabaseManager {
     serviceType: string;
     details: any;
   }): Promise<Application | null> {
-    const sql = `
-      INSERT INTO applications (user_id, service_type, status, progress, submitted_at, estimated_completion)
-      VALUES ($1, $2, 'submitted', 0, NOW(), NOW() + INTERVAL '7 days')
-      RETURNING id, user_id as "userId", service_type as "serviceType", status, progress,
-                submitted_at as "submittedAt", estimated_completion as "estimatedCompletion"
-    `;
-    const result = await this.query(sql, [appData.userId, appData.serviceType]);
-    return result[0] || null;
+    const { data, error } = await supabase
+      .from('service_requests')
+      .insert({
+        user_id: appData.userId,
+        service_type: appData.serviceType,
+        status: 'submitted',
+        progress: 0,
+        title: appData.details.title || 'New Application',
+        description: appData.details.description || '',
+        category: appData.details.category || 'general',
+        priority: appData.details.priority || 'normal',
+        estimated_completion_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 days from now
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating application:', error);
+      return null;
+    }
+
+    return {
+      id: data.id,
+      userId: data.user_id,
+      serviceType: data.service_type,
+      status: data.status,
+      progress: data.progress || 0,
+      submittedAt: new Date(data.created_at),
+      estimatedCompletion: data.estimated_completion_date ? new Date(data.estimated_completion_date) : new Date(),
+      completedAt: data.status === 'completed' ? new Date(data.updated_at) : undefined
+    };
   }
 
   async logUserActivity(userId: string, action: string, details: any): Promise<void> {
-    const sql = `
-      INSERT INTO user_activities (user_id, action, details, timestamp)
-      VALUES ($1, $2, $3, NOW())
-    `;
-    await this.query(sql, [userId, action, JSON.stringify(details)]);
+    const { error } = await supabase
+      .from('user_activities')
+      .insert({
+        user_id: userId,
+        action,
+        details: JSON.stringify(details),
+        timestamp: new Date().toISOString()
+      });
+
+    if (error) {
+      console.error('Error logging user activity:', error);
+    }
   }
 
   async getSystemMetrics(): Promise<any> {
-    const queries = [
-      'SELECT COUNT(*) as total_users FROM users',
-      'SELECT COUNT(*) as total_applications FROM applications',
-      'SELECT COUNT(*) as total_certificates FROM certificates',
-      'SELECT service_type, COUNT(*) as count FROM applications GROUP BY service_type',
-      'SELECT status, COUNT(*) as count FROM applications GROUP BY status'
-    ];
-
-    const results = await Promise.all(queries.map(query => this.query(query)));
+    const [
+      { count: totalUsers },
+      { count: totalApplications },
+      { count: totalCertificates },
+      { data: serviceTypes },
+      { data: applicationStatus }
+    ] = await Promise.all([
+      supabase.from('profiles').select('*', { count: 'exact', head: true }),
+      supabase.from('service_requests').select('*', { count: 'exact', head: true }),
+      supabase.from('certificates').select('*', { count: 'exact', head: true }),
+      supabase.from('service_requests').select('service_type').select('count'),
+      supabase.from('service_requests').select('status').select('count')
+    ]);
     
     return {
-      totalUsers: results[0][0]?.total_users || 0,
-      totalApplications: results[1][0]?.total_applications || 0,
-      totalCertificates: results[2][0]?.total_certificates || 0,
-      serviceTypes: results[3] || [],
-      applicationStatus: results[4] || []
+      totalUsers: totalUsers || 0,
+      totalApplications: totalApplications || 0,
+      totalCertificates: totalCertificates || 0,
+      serviceTypes: serviceTypes || [],
+      applicationStatus: applicationStatus || []
     };
+  }
+
+  async testConnection(): Promise<boolean> {
+    try {
+      const { data, error } = await supabase.from('profiles').select('count').limit(1);
+      return !error;
+    } catch (error) {
+      console.error('Error testing database connection:', error);
+      return false;
+    }
   }
 }
 

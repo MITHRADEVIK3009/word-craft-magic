@@ -18,6 +18,7 @@ export type Database = {
           last_name: string | null
           phone: string | null
           updated_at: string
+          email: string | null
         }
         Insert: {
           aadhaar_number?: string | null
@@ -27,6 +28,7 @@ export type Database = {
           last_name?: string | null
           phone?: string | null
           updated_at?: string
+          email?: string | null
         }
         Update: {
           aadhaar_number?: string | null
@@ -36,33 +38,175 @@ export type Database = {
           last_name?: string | null
           phone?: string | null
           updated_at?: string
+          email?: string | null
+        }
+        Relationships: []
+      }
+      otp_records: {
+        Row: {
+          id: string
+          email: string
+          otp: string
+          expires_at: string
+          verified: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          email: string
+          otp: string
+          expires_at: string
+          verified?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          email?: string
+          otp?: string
+          expires_at?: string
+          verified?: boolean
+          created_at?: string
+        }
+        Relationships: []
+      }
+      service_requests: {
+        Row: {
+          id: string
+          user_id: string
+          service_type: string
+          status: string
+          progress: number
+          title: string
+          description: string | null
+          category: string
+          priority: string
+          documents: Json | null
+          estimated_completion_date: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          service_type: string
+          status?: string
+          progress?: number
+          title: string
+          description?: string | null
+          category: string
+          priority: string
+          documents?: Json | null
+          estimated_completion_date?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          service_type?: string
+          status?: string
+          progress?: number
+          title?: string
+          description?: string | null
+          category?: string
+          priority?: string
+          documents?: Json | null
+          estimated_completion_date?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      certificates: {
+        Row: {
+          id: string
+          user_id: string
+          type: string
+          issue_date: string
+          valid_until: string
+          authority: string
+          blockchain_hash: string
+          ipfs_hash: string
+          digital_signature: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          type: string
+          issue_date: string
+          valid_until: string
+          authority: string
+          blockchain_hash: string
+          ipfs_hash: string
+          digital_signature: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          type?: string
+          issue_date?: string
+          valid_until?: string
+          authority?: string
+          blockchain_hash?: string
+          ipfs_hash?: string
+          digital_signature?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      user_activities: {
+        Row: {
+          id: string
+          user_id: string
+          action: string
+          details: Json
+          timestamp: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          action: string
+          details: Json
+          timestamp?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          action?: string
+          details?: Json
+          timestamp?: string
         }
         Relationships: []
       }
       service_request_updates: {
         Row: {
+          id: string
+          request_id: string
+          status: string
+          message: string | null
           created_at: string
           created_by: string | null
-          id: string
-          message: string | null
-          request_id: string
-          status: string
         }
         Insert: {
-          created_at?: string
-          created_by?: string | null
           id?: string
-          message?: string | null
           request_id: string
           status: string
-        }
-        Update: {
+          message?: string | null
           created_at?: string
           created_by?: string | null
+        }
+        Update: {
           id?: string
-          message?: string | null
           request_id?: string
           status?: string
+          message?: string | null
+          created_at?: string
+          created_by?: string | null
         }
         Relationships: [
           {
@@ -71,53 +215,8 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "service_requests"
             referencedColumns: ["id"]
-          },
+          }
         ]
-      }
-      service_requests: {
-        Row: {
-          category: string
-          created_at: string
-          description: string | null
-          documents: Json | null
-          estimated_completion_date: string | null
-          id: string
-          priority: string
-          service_type: string
-          status: string
-          title: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          category: string
-          created_at?: string
-          description?: string | null
-          documents?: Json | null
-          estimated_completion_date?: string | null
-          id?: string
-          priority?: string
-          service_type: string
-          status?: string
-          title: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          category?: string
-          created_at?: string
-          description?: string | null
-          documents?: Json | null
-          estimated_completion_date?: string | null
-          id?: string
-          priority?: string
-          service_type?: string
-          status?: string
-          title?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
       }
     }
     Views: {
