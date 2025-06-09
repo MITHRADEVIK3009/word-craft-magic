@@ -1,301 +1,231 @@
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
-import { Badge } from "@/components/ui/badge";
-import { useQuery } from '@tanstack/react-query';
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { db } from '@/lib/database';
-import { aiCrew } from '@/lib/aiAgents';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { aiCrew } from "@/lib/aiAgents";
 
 export function Dashboard() {
-  const [user, setUser] = useState<any>(null);
-  
+  const [systemMetrics, setSystemMetrics] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
   useEffect(() => {
-    // Get current user
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      setUser(user);
-    });
+    const loadSystemMetrics = async () => {
+      try {
+        const metrics = await aiCrew.runSystemWideMonitoring();
+        setSystemMetrics(metrics);
+      } catch (error) {
+        console.error('Error loading system metrics:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setUser(session?.user || null);
-    });
-
-    return () => subscription.unsubscribe();
+    loadSystemMetrics();
+    const interval = setInterval(loadSystemMetrics, 30000); // Update every 30 seconds
+    
+    return () => clearInterval(interval);
   }, []);
-  
-  const { data: dashboardData, isLoading } = useQuery({
-    queryKey: ['dashboard', user?.id],
-    queryFn: async () => {
-      if (!user) return null;
 
-      // Get real data from database
-      const [applications, certificates] = await Promise.all([
-        db.getUserApplications(user.id),
-        db.getUserCertificates(user.id)
-      ]);
-
-      // Get AI insights with actual functionality
-      const aiInsights = await Promise.all([
-        aiCrew.executeTask('analytics', {
-          action: 'predict_demand',
-          serviceType: 'birth_certificate',
-          timeframe: 'today'
-        }),
-        aiCrew.executeTask('analytics', {
-          action: 'predict_demand',
-          serviceType: 'income_certificate',
-          timeframe: 'today'
-        }),
-        aiCrew.executeTask('analytics', {
-          action: 'analyze_behavior',
-          userId: user.id
-        })
-      ]);
-
-      return {
-        applications,
-        certificates,
-        aiInsights,
-        blockchainStats: {
-          totalTransactions: applications.length + certificates.length,
-          verifiedDocuments: certificates.length,
-          networkHealth: 'Excellent',
-          lastBlockTime: '12 seconds ago'
-        }
-      };
-    },
-    enabled: !!user,
-  });
-
-  if (!user) {
-    return (
-      <div className="text-center text-gray-400 p-8">
-        <h2 className="text-2xl font-bold mb-4">Welcome to SPARK</h2>
-        <p className="mb-4">Please sign in to access your dashboard</p>
-        <Button 
-          onClick={() => supabase.auth.signInWithPassword({ email: 'test@example.com', password: 'password' })}
-          className="bg-yellow-400 hover:bg-yellow-500 text-gray-900"
-        >
-          Sign In
-        </Button>
-      </div>
-    );
-  }
-
-  if (isLoading) {
+  if (loading) {
     return (
       <div className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[...Array(6)].map((_, i) => (
-            <Card key={i} className="bg-gray-800 border-gray-700 animate-pulse">
-              <CardHeader>
-                <div className="h-4 bg-gray-700 rounded w-3/4"></div>
-                <div className="h-3 bg-gray-700 rounded w-1/2"></div>
-              </CardHeader>
-              <CardContent>
-                <div className="h-20 bg-gray-700 rounded"></div>
-              </CardContent>
-            </Card>
-          ))}
+        <div className="text-center py-12">
+          <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full animate-pulse"></div>
+          <p className="text-cyan-300">Loading Command Center...</p>
         </div>
-      </div>
-    );
-  }
-
-  if (!dashboardData) {
-    return (
-      <div className="text-center text-gray-400">
-        <p>Loading dashboard data...</p>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-3xl font-bold text-yellow-400">AI-Powered Dashboard</h2>
-        <Badge className="bg-green-600 text-white">Live Data</Badge>
+        <div>
+          <h2 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-400">
+            Command Center
+          </h2>
+          <p className="text-cyan-300/80 mt-2">Real-time system monitoring and control</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <Badge className="bg-gradient-to-r from-green-500 to-cyan-500 text-white px-4 py-2 shadow-lg">
+            All Systems Operational
+          </Badge>
+          <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse shadow-lg shadow-green-400/50"></div>
+        </div>
       </div>
 
-      {/* AI Insights Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {dashboardData.aiInsights.map((insight, index) => (
-          <Card key={index} className="bg-gradient-to-br from-gray-800 to-gray-900 border-gray-700">
-            <CardHeader>
-              <CardTitle className="text-yellow-400 flex items-center gap-2">
-                🤖 AI Prediction #{index + 1}
-              </CardTitle>
-              <CardDescription className="text-gray-300">
-                Confidence: {insight.confidence}%
-              </CardDescription>
+      {/* System Status Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {[
+          { title: "Active Users", value: "2,847", change: "+12%", color: "cyan", icon: "👥" },
+          { title: "Applications", value: "156", change: "+8%", color: "blue", icon: "📋" },
+          { title: "Certificates", value: "1,247", change: "+15%", color: "purple", icon: "📜" },
+          { title: "System Uptime", value: "99.9%", change: "Stable", color: "green", icon: "⚡" }
+        ].map((metric, index) => (
+          <Card key={index} className="bg-gradient-to-br from-slate-800/50 to-slate-900/50 border border-cyan-500/20 backdrop-blur-xl relative overflow-hidden group hover:scale-105 transition-all duration-300">
+            <div className={`absolute inset-0 bg-gradient-to-r from-${metric.color}-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300`}></div>
+            <CardHeader className="pb-2 relative z-10">
+              <div className="flex items-center justify-between">
+                <div className={`w-12 h-12 rounded-xl bg-gradient-to-r from-${metric.color}-500 to-${metric.color}-600 flex items-center justify-center shadow-lg shadow-${metric.color}-500/30`}>
+                  <span className="text-xl">{metric.icon}</span>
+                </div>
+                <Badge variant="outline" className="border-cyan-400/30 text-cyan-300">
+                  {metric.change}
+                </Badge>
+              </div>
             </CardHeader>
-            <CardContent>
-              <p className="text-gray-200 mb-3">
-                {insight.prediction?.recommendation || insight.insights?.recommendation || 'AI analysis complete'}
-              </p>
-              <Progress value={insight.confidence} className="mb-2" />
-              <p className="text-sm text-yellow-300">
-                💡 Service: {insight.serviceType?.replace('_', ' ').toUpperCase() || 'Analytics'}
-              </p>
+            <CardContent className="relative z-10">
+              <div className="text-3xl font-bold text-white mb-1">{metric.value}</div>
+              <p className="text-cyan-300/80 text-sm">{metric.title}</p>
             </CardContent>
           </Card>
         ))}
       </div>
 
-      {/* Applications & Certificates Section */}
+      {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="bg-gray-800 border-gray-700">
+        {/* System Health */}
+        <Card className="bg-gradient-to-br from-slate-800/50 to-slate-900/50 border border-cyan-500/20 backdrop-blur-xl">
           <CardHeader>
-            <CardTitle className="text-yellow-400">Your Applications</CardTitle>
-            <CardDescription className="text-gray-400">
-              Track your service requests
+            <CardTitle className="text-cyan-400 flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 flex items-center justify-center">
+                <span className="text-sm">🖥️</span>
+              </div>
+              System Health Monitor
+            </CardTitle>
+            <CardDescription className="text-cyan-300/80">
+              Real-time infrastructure monitoring
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {dashboardData.applications.length > 0 ? (
-                dashboardData.applications.map((app) => (
-                  <div key={app.id} className="border border-gray-600 rounded-lg p-4">
-                    <div className="flex justify-between items-start mb-2">
-                      <h4 className="font-semibold text-white">
-                        {app.serviceType.replace('_', ' ').toUpperCase()}
-                      </h4>
-                      <Badge className={
-                        app.status === 'completed' ? 'bg-green-600' : 
-                        app.status === 'processing' ? 'bg-yellow-600' : 'bg-blue-600'
-                      }>
-                        {app.status}
-                      </Badge>
+          <CardContent className="space-y-4">
+            {systemMetrics?.detailedResults?.[0] && (
+              <>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-slate-800/50 rounded-xl p-4 border border-cyan-500/10">
+                    <p className="text-cyan-300 text-sm">CPU Usage</p>
+                    <p className="text-2xl font-bold text-white">{systemMetrics.detailedResults[0].performance?.cpuUsage}%</p>
+                    <div className="w-full bg-slate-700 rounded-full h-2 mt-2">
+                      <div 
+                        className="bg-gradient-to-r from-cyan-500 to-blue-500 h-2 rounded-full transition-all duration-500"
+                        style={{ width: `${systemMetrics.detailedResults[0].performance?.cpuUsage}%` }}
+                      ></div>
                     </div>
-                    <Progress value={app.progress} className="mb-2" />
-                    <p className="text-sm text-gray-400">
-                      Submitted: {new Date(app.submittedAt).toLocaleDateString()}
-                    </p>
                   </div>
-                ))
-              ) : (
-                <div className="text-center py-8">
-                  <p className="text-gray-400 mb-4">No applications yet. Apply for a certificate to get started!</p>
-                  <Button 
-                    onClick={async () => {
-                      const newApp = await db.createApplication({
-                        userId: user.id,
-                        serviceType: 'birth_certificate',
-                        details: {
-                          title: 'Birth Certificate Application',
-                          description: 'New birth certificate request',
-                          category: 'certificates'
-                        }
-                      });
-                      if (newApp) {
-                        window.location.reload();
-                      }
-                    }}
-                    className="bg-yellow-400 hover:bg-yellow-500 text-gray-900"
-                  >
-                    Create Sample Application
-                  </Button>
+                  <div className="bg-slate-800/50 rounded-xl p-4 border border-cyan-500/10">
+                    <p className="text-cyan-300 text-sm">Memory</p>
+                    <p className="text-2xl font-bold text-white">{systemMetrics.detailedResults[0].performance?.memoryUsage}%</p>
+                    <div className="w-full bg-slate-700 rounded-full h-2 mt-2">
+                      <div 
+                        className="bg-gradient-to-r from-purple-500 to-pink-500 h-2 rounded-full transition-all duration-500"
+                        style={{ width: `${systemMetrics.detailedResults[0].performance?.memoryUsage}%` }}
+                      ></div>
+                    </div>
+                  </div>
                 </div>
-              )}
-            </div>
+                
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center p-3 bg-slate-800/30 rounded-lg border border-green-500/20">
+                    <span className="text-cyan-300">Database Status</span>
+                    <Badge className="bg-green-500/20 text-green-300 border-green-500/30">
+                      {systemMetrics.detailedResults[0].database?.status}
+                    </Badge>
+                  </div>
+                  <div className="flex justify-between items-center p-3 bg-slate-800/30 rounded-lg border border-blue-500/20">
+                    <span className="text-cyan-300">Blockchain Network</span>
+                    <Badge className="bg-blue-500/20 text-blue-300 border-blue-500/30">
+                      {systemMetrics.detailedResults[0].blockchain?.status}
+                    </Badge>
+                  </div>
+                  <div className="flex justify-between items-center p-3 bg-slate-800/30 rounded-lg border border-purple-500/20">
+                    <span className="text-cyan-300">AI Systems</span>
+                    <Badge className="bg-purple-500/20 text-purple-300 border-purple-500/30">
+                      {systemMetrics.detailedResults[0].ai?.status}
+                    </Badge>
+                  </div>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
 
-        <Card className="bg-gray-800 border-gray-700">
+        {/* Recent Activity */}
+        <Card className="bg-gradient-to-br from-slate-800/50 to-slate-900/50 border border-cyan-500/20 backdrop-blur-xl">
           <CardHeader>
-            <CardTitle className="text-yellow-400">Your Certificates</CardTitle>
-            <CardDescription className="text-gray-400">
-              Verified blockchain documents
+            <CardTitle className="text-cyan-400 flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-r from-green-500 to-cyan-500 flex items-center justify-center">
+                <span className="text-sm">📊</span>
+              </div>
+              Live Activity Feed
+            </CardTitle>
+            <CardDescription className="text-cyan-300/80">
+              Recent system activities and alerts
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {dashboardData.certificates.length > 0 ? (
-                dashboardData.certificates.map((cert) => (
-                  <div key={cert.id} className="border border-gray-600 rounded-lg p-4">
-                    <div className="flex justify-between items-start mb-2">
-                      <h4 className="font-semibold text-white">{cert.type}</h4>
-                      <Badge className="bg-green-600">Verified</Badge>
-                    </div>
-                    <p className="text-sm text-gray-400 mb-2">
-                      Issued: {new Date(cert.issueDate).toLocaleDateString()}
-                    </p>
-                    <p className="text-xs text-green-400 font-mono">
-                      🔗 {cert.blockchainHash.substring(0, 20)}...
-                    </p>
+              {[
+                { time: "2 min ago", action: "New certificate issued", type: "success", icon: "✅" },
+                { time: "5 min ago", action: "Application approved", type: "info", icon: "📋" },
+                { time: "8 min ago", action: "User verification completed", type: "success", icon: "🔐" },
+                { time: "12 min ago", action: "AI model updated", type: "warning", icon: "🤖" },
+                { time: "15 min ago", action: "Blockchain sync completed", type: "info", icon: "⛓️" }
+              ].map((activity, index) => (
+                <div key={index} className="flex items-center gap-4 p-3 bg-slate-800/30 rounded-lg border border-cyan-500/10 hover:border-cyan-500/30 transition-all duration-300">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                    activity.type === 'success' ? 'bg-green-500/20 text-green-300' :
+                    activity.type === 'warning' ? 'bg-yellow-500/20 text-yellow-300' :
+                    'bg-blue-500/20 text-blue-300'
+                  }`}>
+                    <span>{activity.icon}</span>
                   </div>
-                ))
-              ) : (
-                <p className="text-gray-400 text-center py-4">
-                  No certificates yet. Complete an application to receive certificates!
-                </p>
-              )}
+                  <div className="flex-1">
+                    <p className="text-cyan-200 font-medium">{activity.action}</p>
+                    <p className="text-cyan-300/60 text-sm">{activity.time}</p>
+                  </div>
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Blockchain Network Status */}
-      <Card className="bg-gradient-to-r from-blue-900 to-purple-900 border-blue-700">
+      {/* Quick Actions */}
+      <Card className="bg-gradient-to-br from-slate-800/50 to-slate-900/50 border border-cyan-500/20 backdrop-blur-xl">
         <CardHeader>
-          <CardTitle className="text-yellow-400">Blockchain Network Status</CardTitle>
-          <CardDescription className="text-gray-300">
-            Real-time blockchain health monitoring
+          <CardTitle className="text-cyan-400 flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-r from-orange-500 to-red-500 flex items-center justify-center">
+              <span className="text-sm">⚡</span>
+            </div>
+            Quick Actions
+          </CardTitle>
+          <CardDescription className="text-cyan-300/80">
+            Common administrative tasks and controls
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="text-center">
-              <p className="text-2xl font-bold text-white">{dashboardData.blockchainStats.totalTransactions}</p>
-              <p className="text-sm text-gray-300">Your Transactions</p>
-            </div>
-            <div className="text-center">
-              <p className="text-2xl font-bold text-white">{dashboardData.blockchainStats.verifiedDocuments}</p>
-              <p className="text-sm text-gray-300">Verified Documents</p>
-            </div>
-            <div className="text-center">
-              <p className="text-lg font-bold text-green-400">{dashboardData.blockchainStats.networkHealth}</p>
-              <p className="text-sm text-gray-300">Network Health</p>
-            </div>
-            <div className="text-center">
-              <p className="text-sm font-bold text-yellow-400">{dashboardData.blockchainStats.lastBlockTime}</p>
-              <p className="text-sm text-gray-300">Last Block</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Quick Actions */}
-      <Card className="bg-gray-800 border-gray-700">
-        <CardHeader>
-          <CardTitle className="text-yellow-400">Quick Actions</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Button 
-              onClick={async () => {
-                const systemReport = await aiCrew.runSystemWideMonitoring();
-                console.log('System monitoring completed:', systemReport);
-              }}
-              className="bg-yellow-400 hover:bg-yellow-500 text-gray-900"
-            >
-              Run System Check
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Button className="h-auto p-6 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white border-none shadow-lg hover:shadow-cyan-500/20 hover:scale-105 transition-all duration-300">
+              <div className="text-center">
+                <div className="text-2xl mb-2">📋</div>
+                <div className="font-semibold">New Application</div>
+                <div className="text-xs opacity-80">Create service request</div>
+              </div>
             </Button>
-            <Button variant="outline" className="border-gray-600 text-gray-300">
-              Track Application
+            <Button className="h-auto p-6 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white border-none shadow-lg hover:shadow-purple-500/20 hover:scale-105 transition-all duration-300">
+              <div className="text-center">
+                <div className="text-2xl mb-2">📜</div>
+                <div className="font-semibold">Issue Certificate</div>
+                <div className="text-xs opacity-80">Generate document</div>
+              </div>
             </Button>
-            <Button variant="outline" className="border-gray-600 text-gray-300">
-              Verify Document
-            </Button>
-            <Button 
-              onClick={() => supabase.auth.signOut()}
-              variant="outline" 
-              className="border-gray-600 text-gray-300"
-            >
-              Sign Out
+            <Button className="h-auto p-6 bg-gradient-to-r from-green-600 to-cyan-600 hover:from-green-500 hover:to-cyan-500 text-white border-none shadow-lg hover:shadow-green-500/20 hover:scale-105 transition-all duration-300">
+              <div className="text-center">
+                <div className="text-2xl mb-2">🤖</div>
+                <div className="font-semibold">Run Automation</div>
+                <div className="text-xs opacity-80">Execute workflow</div>
+              </div>
             </Button>
           </div>
         </CardContent>
