@@ -10,11 +10,28 @@ import { CertificatesPage } from "@/components/CertificatesPage";
 import { CommunityPage } from "@/components/CommunityPage";
 import { ProfilePage } from "@/components/ProfilePage";
 import { AdminDashboard } from "@/components/AdminDashboard";
-import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 
 const Index = () => {
-  const { user, isLoading } = useAuth();
+  const [user, setUser] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState('dashboard');
+
+  useEffect(() => {
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user || null);
+      setIsLoading(false);
+    });
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setUser(session?.user || null);
+      setIsLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   if (isLoading) {
     return (
@@ -54,7 +71,7 @@ const Index = () => {
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
       <SidebarProvider>
         <div className="flex w-full min-h-screen">
-          <AppSidebar currentPage={currentPage} setCurrentPage={setCurrentPage} userRole={user.role} />
+          <AppSidebar currentPage={currentPage} setCurrentPage={setCurrentPage} userRole="citizen" />
           <SidebarInset className="flex-1">
             <header className="bg-gray-800/50 backdrop-blur-sm border-b border-gray-700 p-4 flex items-center justify-between">
               <div className="flex items-center gap-4">
@@ -64,10 +81,10 @@ const Index = () => {
                 </h1>
               </div>
               <div className="flex items-center gap-4">
-                <span className="text-gray-300">Welcome, {user.name}</span>
+                <span className="text-gray-300">Welcome, {user.email}</span>
                 <div className="w-8 h-8 bg-yellow-400 rounded-full flex items-center justify-center">
                   <span className="text-gray-900 font-bold">
-                    {user.name?.charAt(0).toUpperCase()}
+                    {user.email?.charAt(0).toUpperCase()}
                   </span>
                 </div>
               </div>

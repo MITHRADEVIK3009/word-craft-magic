@@ -1,48 +1,58 @@
+
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../integrations/supabase/client';
-import { aiCrew } from '../integrations/aiCrew/client';
 
 const SupabaseConnectionTest: React.FC = () => {
   const [result, setResult] = useState<string>('Testing connection...');
 
   useEffect(() => {
     const testConnection = async () => {
-      // Use a valid table name: 'profiles'
-      const { data, error } = await supabase.from('profiles').select('*').limit(1);
-      if (error) {
-        setResult(`Connection failed: ${error.message}`);
-      } else {
-        setResult(`Connection successful! Sample data: ${JSON.stringify(data)}`);
+      try {
+        const { data, error } = await supabase.from('profiles').select('*').limit(1);
+        if (error) {
+          setResult(`Connection failed: ${error.message}`);
+        } else {
+          setResult(`Connection successful! Found ${data?.length || 0} profiles`);
+        }
+      } catch (err) {
+        setResult(`Connection error: ${err instanceof Error ? err.message : 'Unknown error'}`);
       }
     };
     testConnection();
   }, []);
 
-  const handleAIConnectionTest = async () => {
+  const testDatabaseOperations = async () => {
     try {
-      const aiResult = await aiCrew.executeTask('auth', { action: 'generate_otp', email: 'user@example.com' });
-      setResult(`AI Connection successful! Result: ${aiResult}`);
-    } catch (error) {
-      setResult(`AI Connection failed: ${error.message}`);
-    }
-  };
+      // Test basic operations
+      const { data: profiles, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .limit(5);
 
-  const systemReport = async () => {
-    try {
-      const systemReport = await aiCrew.runSystemWideMonitoring();
-      setResult(`System Report: ${JSON.stringify(systemReport)}`);
+      const { data: requests, error: requestError } = await supabase
+        .from('service_requests')
+        .select('*')
+        .limit(5);
+
+      if (profileError || requestError) {
+        setResult(`Database test failed: ${profileError?.message || requestError?.message}`);
+      } else {
+        setResult(`Database test successful! Profiles: ${profiles?.length || 0}, Requests: ${requests?.length || 0}`);
+      }
     } catch (error) {
-      setResult(`System Report failed: ${error.message}`);
+      setResult(`Database test failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
   return (
     <div style={{ padding: 16, background: '#eee', borderRadius: 8 }}>
-      {result}
-      <button onClick={handleAIConnectionTest}>Test AI Connection</button>
-      <button onClick={systemReport}>Get System Report</button>
+      <h3>Supabase Connection Test</h3>
+      <p>{result}</p>
+      <button onClick={testDatabaseOperations} style={{ marginTop: 10, padding: '8px 16px' }}>
+        Test Database Operations
+      </button>
     </div>
   );
 };
 
-export default SupabaseConnectionTest; 
+export default SupabaseConnectionTest;

@@ -4,12 +4,27 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { useQuery } from '@tanstack/react-query';
-import { useAuth } from '@/hooks/useAuth';
+import { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import { db } from '@/lib/database';
 import { aiCrew } from '@/lib/aiAgents';
 
 export function Dashboard() {
-  const { user } = useAuth();
+  const [user, setUser] = useState<any>(null);
+  
+  useEffect(() => {
+    // Get current user
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setUser(user);
+    });
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setUser(session?.user || null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
   
   const { data: dashboardData, isLoading } = useQuery({
     queryKey: ['dashboard', user?.id],
@@ -22,7 +37,7 @@ export function Dashboard() {
         db.getUserCertificates(user.id)
       ]);
 
-      // Get AI insights
+      // Get AI insights with actual functionality
       const aiInsights = await Promise.all([
         aiCrew.executeTask('analytics', {
           action: 'predict_demand',
@@ -55,6 +70,21 @@ export function Dashboard() {
     enabled: !!user,
   });
 
+  if (!user) {
+    return (
+      <div className="text-center text-gray-400 p-8">
+        <h2 className="text-2xl font-bold mb-4">Welcome to SPARK</h2>
+        <p className="mb-4">Please sign in to access your dashboard</p>
+        <Button 
+          onClick={() => supabase.auth.signInWithPassword({ email: 'test@example.com', password: 'password' })}
+          className="bg-yellow-400 hover:bg-yellow-500 text-gray-900"
+        >
+          Sign In
+        </Button>
+      </div>
+    );
+  }
+
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -78,7 +108,7 @@ export function Dashboard() {
   if (!dashboardData) {
     return (
       <div className="text-center text-gray-400">
-        <p>Please log in to view your dashboard</p>
+        <p>Loading dashboard data...</p>
       </div>
     );
   }
@@ -104,11 +134,11 @@ export function Dashboard() {
             </CardHeader>
             <CardContent>
               <p className="text-gray-200 mb-3">
-                {insight.prediction?.recommendation || 'AI analysis complete'}
+                {insight.prediction?.recommendation || insight.insights?.recommendation || 'AI analysis complete'}
               </p>
               <Progress value={insight.confidence} className="mb-2" />
               <p className="text-sm text-yellow-300">
-                💡 Service: {insight.serviceType?.replace('_', ' ').toUpperCase()}
+                💡 Service: {insight.serviceType?.replace('_', ' ').toUpperCase() || 'Analytics'}
               </p>
             </CardContent>
           </Card>
@@ -147,9 +177,28 @@ export function Dashboard() {
                   </div>
                 ))
               ) : (
-                <p className="text-gray-400 text-center py-4">
-                  No applications yet. Apply for a certificate to get started!
-                </p>
+                <div className="text-center py-8">
+                  <p className="text-gray-400 mb-4">No applications yet. Apply for a certificate to get started!</p>
+                  <Button 
+                    onClick={async () => {
+                      const newApp = await db.createApplication({
+                        userId: user.id,
+                        serviceType: 'birth_certificate',
+                        details: {
+                          title: 'Birth Certificate Application',
+                          description: 'New birth certificate request',
+                          category: 'certificates'
+                        }
+                      });
+                      if (newApp) {
+                        window.location.reload();
+                      }
+                    }}
+                    className="bg-yellow-400 hover:bg-yellow-500 text-gray-900"
+                  >
+                    Create Sample Application
+                  </Button>
+                </div>
               )}
             </div>
           </CardContent>
@@ -226,8 +275,14 @@ export function Dashboard() {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Button className="bg-yellow-400 hover:bg-yellow-500 text-gray-900">
-              Apply for Certificate
+            <Button 
+              onClick={async () => {
+                const systemReport = await aiCrew.runSystemWideMonitoring();
+                console.log('System monitoring completed:', systemReport);
+              }}
+              className="bg-yellow-400 hover:bg-yellow-500 text-gray-900"
+            >
+              Run System Check
             </Button>
             <Button variant="outline" className="border-gray-600 text-gray-300">
               Track Application
@@ -235,8 +290,12 @@ export function Dashboard() {
             <Button variant="outline" className="border-gray-600 text-gray-300">
               Verify Document
             </Button>
-            <Button variant="outline" className="border-gray-600 text-gray-300">
-              Contact Support
+            <Button 
+              onClick={() => supabase.auth.signOut()}
+              variant="outline" 
+              className="border-gray-600 text-gray-300"
+            >
+              Sign Out
             </Button>
           </div>
         </CardContent>
