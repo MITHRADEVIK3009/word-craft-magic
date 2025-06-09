@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
@@ -10,6 +9,7 @@ import { CertificatesPage } from "@/components/CertificatesPage";
 import { CommunityPage } from "@/components/CommunityPage";
 import { ProfilePage } from "@/components/ProfilePage";
 import { AdminDashboard } from "@/components/AdminDashboard";
+import { AutomationDashboard } from "@/components/AutomationDashboard";
 import { supabase } from "@/integrations/supabase/client";
 
 const Index = () => {
@@ -56,6 +56,8 @@ const Index = () => {
         return <ApplicationsPage />;
       case 'certificates':
         return <CertificatesPage />;
+      case 'automation':
+        return <AutomationDashboard />;
       case 'community':
         return <CommunityPage />;
       case 'profile':
