@@ -19,6 +19,7 @@ const menuItems = [
   { id: 'applications', label: 'Applications', icon: '📋', gradient: 'from-blue-500 to-purple-500' },
   { id: 'certificates', label: 'Digital Certificates', icon: '📜', gradient: 'from-purple-500 to-pink-500' },
   { id: 'automation', label: 'AI Automation', icon: '⚙️', gradient: 'from-green-500 to-cyan-500' },
+  { id: 'notifications', label: 'Notifications', icon: '🔔', gradient: 'from-yellow-500 to-orange-500' },
   { id: 'community', label: 'Community Hub', icon: '👥', gradient: 'from-orange-500 to-red-500' },
   { id: 'profile', label: 'User Profile', icon: '👤', gradient: 'from-indigo-500 to-purple-500' },
 ];

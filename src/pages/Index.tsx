@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
@@ -12,6 +11,9 @@ import { ProfilePage } from "@/components/ProfilePage";
 import { AdminDashboard } from "@/components/AdminDashboard";
 import { AutomationDashboard } from "@/components/AutomationDashboard";
 import { supabase } from "@/integrations/supabase/client";
+import { DocumentUpload } from "@/components/DocumentUpload";
+import { NotificationSystem } from "@/components/NotificationSystem";
+import { LanguageSelector } from "@/components/LanguageSelector";
 
 const Index = () => {
   const [user, setUser] = useState<any>(null);
@@ -73,7 +75,12 @@ const Index = () => {
       case 'dashboard':
         return <Dashboard />;
       case 'applications':
-        return <ApplicationsPage />;
+        return (
+          <div className="space-y-6">
+            <ApplicationsPage />
+            <DocumentUpload />
+          </div>
+        );
       case 'certificates':
         return <CertificatesPage />;
       case 'automation':
@@ -84,6 +91,8 @@ const Index = () => {
         return <ProfilePage />;
       case 'admin':
         return <AdminDashboard />;
+      case 'notifications':
+        return <NotificationSystem />;
       default:
         return <Dashboard />;
     }
@@ -128,6 +137,7 @@ const Index = () => {
               </div>
               
               <div className="flex items-center gap-4 relative z-10">
+                <LanguageSelector />
                 <div className="hidden md:flex items-center gap-2 px-3 py-1 bg-slate-800/50 rounded-full border border-cyan-500/20">
                   <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
                   <span className="text-cyan-300 text-sm">System Online</span>
