@@ -6,7 +6,7 @@ export function DatabaseTest() {
   const [connectionStatus, setConnectionStatus] = useState<'testing' | 'success' | 'error'>('testing');
   const [authStatus, setAuthStatus] = useState<'testing' | 'success' | 'error'>('testing');
   const [error, setError] = useState<string | null>(null);
-  const [details, setDetails] = useState<any>({});
+  const [details, setDetails] = useState<Record<string, string>>({});
 
   useEffect(() => {
     async function runTests() {
@@ -113,6 +113,33 @@ export function DatabaseTest() {
     }
   };
 
+  const confirmUser = async () => {
+    try {
+      // Try to confirm the existing user
+      const { error } = await supabase.auth.admin.updateUserById(
+        '2f3ce786-213d-4d1c-bea7-d191bfef6e1a', 
+        { email_confirm: true }
+      );
+      
+      if (error) {
+        setDetails(prev => ({ 
+          ...prev, 
+          userConfirmation: `❌ Manual confirmation failed: ${error.message}. Use Supabase dashboard instead.`
+        }));
+      } else {
+        setDetails(prev => ({ 
+          ...prev, 
+          userConfirmation: '✅ User manually confirmed! Try logging in with mithradevik.cse2023@gmail.com'
+        }));
+      }
+    } catch (error) {
+      setDetails(prev => ({ 
+        ...prev, 
+        userConfirmation: `❌ Confirmation error: ${error instanceof Error ? error.message : 'Unknown error'}`
+      }));
+    }
+  };
+
   return (
     <div className="p-6 bg-gray-800 rounded-lg space-y-4">
       <h2 className="text-xl font-bold text-yellow-400 mb-4">System Health Check</h2>
@@ -165,6 +192,24 @@ export function DatabaseTest() {
         >
           Test Authentication Flow
         </button>
+
+        <button 
+          onClick={confirmUser}
+          className="w-full p-2 bg-green-600 hover:bg-green-700 text-white rounded"
+        >
+          Confirm Mithradevi's Account
+        </button>
+      </div>
+
+      {/* User Account Status */}
+      <div className="bg-blue-900/20 border border-blue-600/50 p-3 rounded">
+        <p className="text-blue-400 font-semibold mb-2">Found Unconfirmed User:</p>
+        <ul className="text-blue-200 text-sm space-y-1">
+          <li>• Email: mithradevik.cse2023@gmail.com</li>
+          <li>• Status: Account created but email not confirmed</li>
+          <li>• Created: 06 Jun, 2025</li>
+          <li>• Solution: Click "Confirm Account" above or use Supabase dashboard</li>
+        </ul>
       </div>
 
       {/* Detailed Results */}
@@ -194,8 +239,8 @@ export function DatabaseTest() {
         <ul className="text-yellow-200 text-sm space-y-1">
           <li>• Enable signups in Supabase Dashboard → Auth → Settings</li>
           <li>• Disable email confirmation for easier testing</li>
+          <li>• Confirm Mithradevi's account manually in dashboard</li>
           <li>• Set proper Site URL and Redirect URLs in Auth settings</li>
-          <li>• Create a demo user manually if needed</li>
         </ul>
       </div>
     </div>
