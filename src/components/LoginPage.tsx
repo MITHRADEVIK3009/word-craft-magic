@@ -34,19 +34,27 @@ export function LoginPage() {
         password: loginData.password,
       });
 
-      if (error) throw error;
+      if (error) {
+        if (error.message.includes('Email not confirmed')) {
+          setError('Please check your email and click the confirmation link before logging in.');
+        } else if (error.message.includes('Invalid login credentials')) {
+          setError('Invalid email or password. Please check your credentials and try again.');
+        } else {
+          setError(error.message);
+        }
+        return;
+      }
 
       console.log('Login successful:', data);
       setSuccess('Login successful! Redirecting...');
       
-      // Redirect after successful login
       setTimeout(() => {
         navigate('/');
       }, 1000);
 
     } catch (error: any) {
       console.error('Login error:', error);
-      setError(error.message || 'Login failed');
+      setError('An unexpected error occurred. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -59,6 +67,12 @@ export function LoginPage() {
 
     if (signupData.password !== signupData.confirmPassword) {
       setError('Passwords do not match');
+      setIsLoading(false);
+      return;
+    }
+
+    if (signupData.password.length < 6) {
+      setError('Password must be at least 6 characters long');
       setIsLoading(false);
       return;
     }
@@ -76,14 +90,58 @@ export function LoginPage() {
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        if (error.message.includes('Signups not allowed')) {
+          setError('Account registration is currently disabled. Please contact the administrator or try logging in with an existing account.');
+        } else if (error.message.includes('User already registered')) {
+          setError('An account with this email already exists. Please try logging in instead.');
+        } else {
+          setError(error.message);
+        }
+        return;
+      }
 
       console.log('Signup successful:', data);
-      setSuccess('Registration successful! Please check your email to verify your account.');
+      
+      if (data.user && !data.user.email_confirmed_at) {
+        setSuccess('Registration successful! Please check your email to verify your account before logging in.');
+      } else {
+        setSuccess('Registration successful! You can now log in.');
+      }
 
     } catch (error: any) {
       console.error('Signup error:', error);
-      setError(error.message || 'Registration failed');
+      setError('An unexpected error occurred during registration. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDemoLogin = async () => {
+    setIsLoading(true);
+    setError('');
+    
+    // Demo credentials - you can create these in your Supabase dashboard
+    const demoCredentials = {
+      email: 'demo@spark.gov.in',
+      password: 'demo123456'
+    };
+
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword(demoCredentials);
+
+      if (error) {
+        setError('Demo login is not available. Please contact the administrator.');
+        return;
+      }
+
+      setSuccess('Demo login successful! Redirecting...');
+      setTimeout(() => {
+        navigate('/');
+      }, 1000);
+
+    } catch (error) {
+      setError('Demo login failed. Please try manual login.');
     } finally {
       setIsLoading(false);
     }
@@ -143,6 +201,17 @@ export function LoginPage() {
                     {isLoading ? 'Signing In...' : 'Sign In'}
                   </Button>
                 </form>
+
+                <div className="text-center">
+                  <Button 
+                    onClick={handleDemoLogin}
+                    variant="outline"
+                    className="w-full border-gray-600 text-gray-300 hover:bg-gray-700"
+                    disabled={isLoading}
+                  >
+                    Try Demo Account
+                  </Button>
+                </div>
               </TabsContent>
 
               <TabsContent value="signup" className="space-y-4">
@@ -191,6 +260,7 @@ export function LoginPage() {
                       onChange={(e) => setSignupData({...signupData, password: e.target.value})}
                       className="bg-gray-700 border-gray-600 text-white"
                       required
+                      minLength={6}
                     />
                   </div>
                   <div>
@@ -202,6 +272,7 @@ export function LoginPage() {
                       onChange={(e) => setSignupData({...signupData, confirmPassword: e.target.value})}
                       className="bg-gray-700 border-gray-600 text-white"
                       required
+                      minLength={6}
                     />
                   </div>
                   <Button 
@@ -232,6 +303,9 @@ export function LoginPage() {
         <div className="mt-6 text-center">
           <p className="text-gray-400 text-sm">
             Powered by AI & Blockchain Technology
+          </p>
+          <p className="text-gray-500 text-xs mt-2">
+            Having trouble? Contact support at admin@spark.gov.in
           </p>
         </div>
       </div>

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
@@ -10,6 +11,7 @@ import { CommunityPage } from "@/components/CommunityPage";
 import { ProfilePage } from "@/components/ProfilePage";
 import { AdminDashboard } from "@/components/AdminDashboard";
 import { AutomationDashboard } from "@/components/AutomationDashboard";
+import { DatabaseTest } from "@/components/DatabaseTest";
 import { supabase } from "@/integrations/supabase/client";
 import { DocumentUpload } from "@/components/DocumentUpload";
 import { NotificationSystem } from "@/components/NotificationSystem";
@@ -93,6 +95,8 @@ const Index = () => {
         return <AdminDashboard />;
       case 'notifications':
         return <NotificationSystem />;
+      case 'database-test':
+        return <DatabaseTest />;
       default:
         return <Dashboard />;
     }
